@@ -2,6 +2,7 @@ local QBCore = exports['qb-core']:GetCoreObject()
 local washTracker = {}
 
 Citizen.CreateThread(function()
+    exports['qb-core']:AddItem('markedcash', Config.markedCash)
     QBCore.Functions.CreateUseableItem('markedbills', function(source, item)
         local Player = QBCore.Functions.GetPlayer(source)
 

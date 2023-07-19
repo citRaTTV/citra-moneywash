@@ -26,3 +26,15 @@ Config.washLocations = {
 Config.washTime = function()
     return math.random(15000, 25000)
 end
+Config.markedCash = {
+    ['name'] = 'markedcash',
+    ['label'] = 'Stack of Marked Money',
+    ['weight'] = 10,
+    ['type'] = 'item',
+    ['image'] = 'markedcash.png', -- Be sure to add this image to qb-inventory (or your preferred inventory script)
+    ['unique'] = false,
+    ['useable'] = false,
+    ['shouldClose'] = true,
+    ['combinable'] = nil,
+    ['description'] = 'Money?'
+}
