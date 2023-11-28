@@ -1,10 +1,11 @@
 --Made by Apolo ♡#9745 !
 --Dont share without my permissions !
+-- Rework done w/ permission by Apolo, any sharing should be done w/ their permission
 fx_version 'adamant'
 game 'gta5'
 
-author 'Apolo#9745'
-description 'QB-MoneyWash by Apolo'
+author 'citRa'
+description 'QB-MoneyWash by Apolo REWORK by citRa'
 version '1.0.0'
 
 shared_scripts {
