@@ -97,10 +97,12 @@ RegisterNetEvent('QBCore:Client:OnJobUpdate', function(_)
     updateBlip()
 end)
 
-AddEventHandler('onResourceStart', function(resourceName)
-    if resourceName == GetCurrentResourceName() then
-        QBCore.Functions.TriggerCallback('citra-moneywash:server:GetCurCoords', function(_coords)
-            spawnPed(_coords)
-        end)
-    end
+RegisterNetEvent('QBCore:Client:OnPlayerLoaded', function()
+    QBCore.Functions.TriggerCallback('citra-moneywash:server:GetCurCoords', function(_coords)
+        spawnPed(_coords)
+    end)
+end)
+
+RegisterNetEvent('QBCore:Client:OnPlayerUnload', function()
+    teardownPed()
 end)
