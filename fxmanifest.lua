@@ -7,6 +7,7 @@ game 'gta5'
 author 'citRa'
 description 'QB-MoneyWash by Apolo REWORK by citRa'
 version '1.0.0'
+lua54 'yes'
 
 shared_scripts {
     '@qb-core/shared/items.lua',
