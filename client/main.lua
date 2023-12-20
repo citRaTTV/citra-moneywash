@@ -1,64 +1,73 @@
+-- Variables
 local QBCore = exports['qb-core']:GetCoreObject()
-local currentPed
+local pedEntity, blip, coords = 0, 0, vector4(0, 0, 0, 0)
 
-Text3D = function(x, y, z, text)
-	SetTextScale(0.35, 0.35)
-    SetTextFont(4)
-    SetTextProportional(1)
-    SetTextColour(255, 255, 255, 215)
-    SetTextEntry("STRING")
-    SetTextCentre(true)
-    AddTextComponentString(text)
-    SetDrawOrigin(x,y,z, 0)
-    DrawText(0.0, 0.0)
-    local factor = (string.len(text)) / 370
-    DrawRect(0.0, 0.0+0.0125, 0.017+ factor, 0.03, 0, 0, 0, 75)
-    ClearDrawOrigin()
+-- Functions
+local function teardownPed()
+    if pedEntity ~= 0 then
+        exports['qb-target']:RemoveTargetEntity(pedEntity)
+        TaskWanderStandard(pedEntity, 10.0, 10)
+        SetEntityAsNoLongerNeeded(pedEntity)
+        RemoveBlip(blip)
+    end
 end
 
-Citizen.CreateThread(function()
-    local model = GetHashKey(Config.ped)
-    for _, location in ipairs(Config.washLocations) do
-        while not HasModelLoaded(model) do
-            RequestModel(model)
-            Citizen.Wait(0)
-        end
-        location.ped = CreatePed(4, model, location.coords.x, location.coords.y, location.coords.z - 1.0, location.coords.w, false, false)
-        SetBlockingOfNonTemporaryEvents(location.ped, true)
-        FreezeEntityPosition(location.ped, true)
-        SetEntityInvincible(location.ped, true)
+local function updateBlip()
+    if not Config.blipEnabled then return end
+    local PlayerData = QBCore.Functions.GetPlayerData()
+
+    if PlayerData.job.type ~= 'leo' then
+        blip = AddBlipForCoord(coords.xyz)
+        SetBlipSprite(blip, 456)
+        SetBlipColour(blip, 79)
+        SetBlipScale(blip, 1.0)
+        SetBlipDisplay(blip, 4)
+        SetBlipAsShortRange(blip, true)
+        BeginTextCommandSetBlipName('STRING')
+        AddTextComponentSubstringPlayerName("Shady person")
+        EndTextCommandSetBlipName(blip)
     end
-end)
+end
 
-Citizen.CreateThread(function()
-    while true do
-        local inRange = false
-        local PlayerPos = GetEntityCoords(PlayerPedId())
+local function spawnPed(_coords)
+    teardownPed()
 
-        for _, location in ipairs(Config.washLocations) do
-            local distance = #(PlayerPos - vector3(location.coords.x, location.coords.y, location.coords.z))
+    local model = joaat(Config.ped)
+    coords = _coords
 
-            if distance < 5 then
-                inRange = true
-                Text3D(location.coords.x, location.coords.y, location.coords.z, "[G] Wash Money")
-                if distance < 2 and IsControlJustPressed(0, 47) then
-                    currentPed = location.ped
-                    PlayPedAmbientSpeechWithVoiceNative(currentPed, "GENERIC_HI", Config.pedVoice, "Speech_Params_Standard", 0)
-                    TriggerServerEvent("apolo_moneywash:server:checkmoney")
-                end
-                break
-            end
-        end
-
-        if not inRange then
-            Citizen.Wait(2000)
-        end
-        Citizen.Wait(3)
+    while not HasModelLoaded(model) do
+        RequestModel(model)
+        Citizen.Wait(10)
     end
-end)
+    pedEntity = CreatePed(4, model, coords.x, coords.y, coords.z - 1.0, coords.w, false, true)
+    SetBlockingOfNonTemporaryEvents(pedEntity, true)
+    FreezeEntityPosition(pedEntity, true)
+    SetEntityInvincible(pedEntity, true)
 
-RegisterNetEvent('apolo_moneywash:client:WashProggress')
-AddEventHandler('apolo_moneywash:client:WashProggress', function()
+    exports['qb-target']:AddTargetEntity(pedEntity, {
+        options = {
+            {
+                label = 'Wash money',
+                action = function(entity)
+                    local PlayerData = QBCore.Functions.GetPlayerData()
+
+                    if PlayerData.job.type == 'leo' then
+                        QBCore.Functions.Notify("I don't talk to cops yo!", 'error')
+                    else
+                        PlayPedAmbientSpeechWithVoiceNative(pedEntity, "GENERIC_HI", Config.pedVoice, "Speech_Params_Standard", 0)
+                        TriggerServerEvent("citra-moneywash:server:checkmoney")
+                    end
+                end,
+            },
+        },
+        distance = 2.0,
+    })
+
+    updateBlip()
+end
+
+-- Events
+RegisterNetEvent('citra-moneywash:client:WashProgress', function()
     QBCore.Functions.Progressbar("wash_money", "Washing Money...", Config.washTime(), false, true, {
             disableMovement = true,
             disableCarMovement = true,
@@ -68,14 +77,30 @@ AddEventHandler('apolo_moneywash:client:WashProggress', function()
             animDict = Config.washAnimation.dict,
             anim = Config.washAnimation.anim,
             flags = 1,
-        }, Config.washAnimation.prop, {}, function() -- Done
+        }, {}, {}, function() -- Done
             StopAnimTask(PlayerPedId(), Config.washAnimation.dict, Config.washAnimation.anim, 1.0)
-            TriggerServerEvent("apolo_moneywash:server:getmoney")
-            PlayPedAmbientSpeechWithVoiceNative(currentPed, "GENERIC_THANKS", Config.pedVoice, "Speech_Params_Standard", 0)
+            TriggerServerEvent("citra-moneywash:server:getmoney")
+            PlayPedAmbientSpeechWithVoiceNative(pedEntity, "GENERIC_THANKS", Config.pedVoice, "Speech_Params_Standard", 0)
         end, function() -- Cancel
             StopAnimTask(PlayerPedId(), Config.washAnimation.dict, Config.washAnimation.anim, 1.0)
             QBCore.Functions.Notify("Canceled..", "error")
-            PlayPedAmbientSpeechWithVoiceNative(currentPed, "GENERIC_INSULT_MED", Config.pedVoice, "Speech_Params_Standard", 0)
+            PlayPedAmbientSpeechWithVoiceNative(pedEntity, "GENERIC_INSULT_MED", Config.pedVoice, "Speech_Params_Standard", 0)
         end
     )
+end)
+
+RegisterNetEvent('citra-moneywash:client:UpdateLocation', function(_coords)
+    spawnPed(_coords)
+end)
+
+RegisterNetEvent('QBCore:Client:OnJobUpdate', function(_)
+    updateBlip()
+end)
+
+AddEventHandler('onResourceStart', function(resourceName)
+    if resourceName == GetCurrentResourceName() then
+        QBCore.Functions.TriggerCallback('citra-moneywash:server:GetCurCoords', function(_coords)
+            spawnPed(_coords)
+        end)
+    end
 end)

@@ -1,21 +1,8 @@
+-- Variables
 local QBCore = exports['qb-core']:GetCoreObject()
-local washTracker = {}
+local washTracker, lastWash, curCoords, checkingTime = {}, 0, vector4(0, 0, 0, 0), false
 
-Citizen.CreateThread(function()
-    exports['qb-core']:AddItem('markedcash', Config.markedCash)
-    QBCore.Functions.CreateUseableItem('markedbills', function(source, item)
-        local Player = QBCore.Functions.GetPlayer(source)
-
-        if Player.Functions.GetItemByName(item.name) and type(item.info) ~= "string" and tonumber(item.info.worth) then
-            local amount = tonumber(item.info.worth)
-            Player.Functions.RemoveItem(item.name, 1, item.slot)
-            TriggerClientEvent('inventory:client:ItemBox', source, QBCore.Shared.Items['markedbills'], "remove")
-            Player.Functions.AddItem('markedcash', amount)
-            TriggerClientEvent('inventory:client:ItemBox', source, QBCore.Shared.Items['markedcash'], "add")
-        end
-    end)
-end)
-
+-- Functions
 local function getWashed(Player)
     return (washTracker[Player.PlayerData.citizenid] and washTracker[Player.PlayerData.citizenid] or 0)
 end
@@ -29,8 +16,9 @@ local function washMoney(worth, Player)
     print('Citizen ' .. Player.PlayerData.citizenid .. ' has washed $' .. washTracker[Player.PlayerData.citizenid] .. ' today.')
 end
 
-RegisterServerEvent('apolo_moneywash:server:getmoney')
-AddEventHandler('apolo_moneywash:server:getmoney', function()
+-- Events
+RegisterServerEvent('citra-moneywash:server:getmoney')
+AddEventHandler('citra-moneywash:server:getmoney', function()
     local src = source
     local Player = QBCore.Functions.GetPlayer(tonumber(src))
     local alreadyWashed = getWashed(Player)
@@ -53,8 +41,8 @@ AddEventHandler('apolo_moneywash:server:getmoney', function()
     end
 end)
 
-RegisterServerEvent('apolo_moneywash:server:checkmoney')
-AddEventHandler('apolo_moneywash:server:checkmoney', function()
+RegisterServerEvent('citra-moneywash:server:checkmoney')
+AddEventHandler('citra-moneywash:server:checkmoney', function()
     local src = source
     local Player = QBCore.Functions.GetPlayer(src)
     local alreadyWashed = getWashed(Player)
@@ -72,9 +60,54 @@ AddEventHandler('apolo_moneywash:server:checkmoney', function()
         end
 
         if hasMarked then
-            TriggerClientEvent('apolo_moneywash:client:WashProggress', src)
+            lastWash = GetGameTimer()
+            TriggerClientEvent('citra-moneywash:client:WashProgress', src)
+
+            if checkingTime then return end
+
+            CreateThread(function()
+                checkingTime = true
+                while (GetGameTimer() - lastWash) < (1 * 60 * 1000) do
+                    Wait(10000)
+                end
+                checkingTime = false
+                lastWash = 0
+
+                local newCoords = Config.washLocations[math.random(#Config.washLocations)]
+                while newCoords == curCoords do
+                    newCoords = Config.washLocations[math.random(#Config.washLocations)]
+                    Wait(1)
+                end
+
+                curCoords = newCoords
+                TriggerClientEvent('citra-moneywash:client:UpdateLocation', -1, curCoords)
+            end)
         else
             TriggerClientEvent('QBCore:Notify', src, "You do not have marked money or I've already washed too much for you", 'error')
         end
     end
+end)
+
+AddEventHandler('onResourceStart', function(resourceName)
+    if resourceName == GetCurrentResourceName() then
+        exports['qb-core']:AddItem('markedcash', Config.markedCash)
+        QBCore.Functions.CreateUseableItem('markedbills', function(source, item)
+            local Player = QBCore.Functions.GetPlayer(source)
+
+            if Player.Functions.GetItemByName(item.name) and type(item.info) ~= "string" and tonumber(item.info.worth) then
+                local amount = tonumber(item.info.worth)
+                Player.Functions.RemoveItem(item.name, 1, item.slot)
+                TriggerClientEvent('inventory:client:ItemBox', source, QBCore.Shared.Items['markedbills'], "remove")
+                Player.Functions.AddItem('markedcash', amount)
+                TriggerClientEvent('inventory:client:ItemBox', source, QBCore.Shared.Items['markedcash'], "add")
+            end
+        end)
+
+        curCoords = Config.washLocations[math.random(#Config.washLocations)]
+    end
+end)
+
+-- Callbacks
+QBCore.Functions.CreateCallback('citra-moneywash:server:GetCurCoords', function(source, cb)
+    cb(curCoords)
 end)
